@@ -467,6 +467,98 @@ class ShareGPTPromptTokenizingStrategy(PromptTokenizingStrategy):
         return result
 
 
+class AlpacaMTPromptTokenizingStrategy(PromptTokenizingStrategy):
+    """
+    Tokenizing strategy for ShareGPT prompts, but with an alpaca prompt
+    """
+
+    def get_conversation_thread(self, prompt):
+        return prompt["conversations"]
+
+    def tokenize_prompt(self, prompt):
+        result, current_len = tokenize_prompt_default()
+        user_token = self._get_user_token()
+        assistant_token = self._get_assistant_token()
+        try:
+            for _, part in enumerate(
+                self.prompter.build_prompt(self.get_conversation_thread(prompt))
+            ):
+                if isinstance(part, tuple):
+                    if part[0] == "### Input: \n":
+                        part = part[0] + part[1] if not user_token else part[1]
+                        # this is still the user query, we should
+                        res = self._tokenize(
+                            part.strip(),
+                            add_eos_token=False,
+                            strip_bos_token=True,
+                        )
+                        if user_token:
+                            res["input_ids"] = [user_token, *res["input_ids"]]
+                        # everything from this is masked out from the labels
+                        labels = [IGNORE_TOKEN_ID] * len(res["input_ids"])
+                    elif part[0] == "### Response:":
+                        # TODO label assistant token/tokens w/ IGNORE_TOKEN_ID
+                        part = part[0] + part[1] if not assistant_token else part[1]
+                        # this should be the assistent response, should end with an eos token
+                        res = self._tokenize(
+                            part.strip(),
+                            add_eos_token=True,
+                            strip_bos_token=True,
+                        )
+                        if assistant_token:
+                            res["input_ids"] = [
+                                assistant_token,
+                                *res["input_ids"],
+                            ]
+                        # not masked out from labels
+                        labels = copy.deepcopy(res["input_ids"])
+                    elif part[0] == "SYSTEM:":
+                        part = part[1]  # Ignore the system role from preamble
+                        # this is only ever the first part, should include the bos token and the user query
+                        res = self._tokenize(
+                            part.strip(), add_eos_token=False, strip_bos_token=False
+                        )
+                        # everything from this is masked out from the labels
+                        labels = [IGNORE_TOKEN_ID] * len(res["input_ids"])
+                    else:
+                        LOG.warning(f"unhandled role: {part[0]}")
+
+                # pylint: disable=duplicate-code
+                result, current_len = parse_tokenized_to_result(
+                    result,
+                    current_len,
+                    res,
+                    labels,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                )
+            return result
+        except (KeyError, AssertionError, IndexError) as err:
+            raise InvalidDataException(str(err)) from err
+
+    def _tokenize(self, prompt, add_eos_token=True, strip_bos_token=False):
+        result = self.tokenizer(
+            prompt,
+            truncation=True,
+            max_length=self.sequence_len,
+            padding=False,
+            return_tensors=None,
+        )
+        if (
+            result["input_ids"][-1] != self.tokenizer.eos_token_id
+            and len(result["input_ids"]) < self.sequence_len
+            and add_eos_token
+        ):
+            result["input_ids"].append(self.tokenizer.eos_token_id)
+            result["attention_mask"].append(1)
+
+        if result["input_ids"][0] == self.tokenizer.bos_token_id and strip_bos_token:
+            result["input_ids"] = result["input_ids"][1:]
+            result["attention_mask"] = result["attention_mask"][1:]
+
+        result["labels"] = result["input_ids"].copy()
+        return result
+
+
 def tokenize_prompt_default() -> Tuple[Dict[str, List[int]], int]:
     """
     Returns the default values for the tokenize prompt function

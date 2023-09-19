@@ -345,3 +345,110 @@ class ShareGPTPrompter:  # pylint: disable=too-few-public-methods
 
         for part in conv.get_prompt():
             yield part
+
+
+# TODO clean this 💩💩 up
+@dataclasses.dataclass
+class AlpacaConversation:
+    """A class that keeps all conversation history. - but for alpaca"""
+
+    system: str
+    roles: List[str]
+    messages: List[List[str]]
+    offset: int
+    sep_style: SeparatorStyle = SeparatorStyle.SINGLE
+    sep: str = "###"
+    sep2: Optional[str] = None
+
+    def get_prompt(self) -> Generator[Tuple[str, str], None, None]:
+        # seps = [self.sep, self.sep2]
+        preamble = self.system + self.sep
+        yield ("### Instruction:\n", preamble)
+        for _, (role, message) in enumerate(self.messages):
+            if message:
+                yield (role + ":", " " + message)
+            else:
+                LOG.warning(f"role with empty message: {role}")
+                yield (role + ":", "")
+
+    def copy(self):
+        return AlpacaConversation(
+            system=self.system,
+            roles=self.roles,
+            messages=[[x, y] for x, y in self.messages],
+            offset=self.offset,
+            sep_style=self.sep_style,
+            sep=self.sep,
+            sep2=self.sep2,
+        )
+
+    def append_message(self, role, message):
+        self.messages.append([role, message])
+
+
+class AlpacaMTPrompter:  # pylint: disable=too-few-public-methods
+    """
+    A prompter that generates prompts for the ShareGPT-style datasets, but for alpaca prompted models
+    """
+
+    def __init__(self, prompt_style=None, system_prompt: Optional[str] = None):
+        if prompt_style != PromptStyle.CHAT.value:
+            raise ValueError(
+                f"unsupported prompt_style for ShareGPTPrompter({prompt_style})"
+            )
+        system: str = (
+            system_prompt
+            if system_prompt
+            else (
+                "A chat between a curious user and an artificial intelligence assistant. "
+                "The assistant gives helpful, detailed, and polite answers to the user's questions."
+            )
+        )
+        self._conversation = AlpacaConversation(
+            system=system,
+            roles=["\n\n### Input:\n", "\n\n### Response:\n"],
+            messages=[],
+            offset=0,
+            sep_style=SeparatorStyle.TWO,
+            sep=" ",
+            sep2=" ",
+        )
+
+    def build_prompt(self, source) -> Generator[str, None, None]:
+        if len(source) < 2:
+            # If there isn't a back and forth conversation, ignore it
+            # also happens on the data splitting leaving empty conversations
+            raise IndexError(
+                f"A conversation entry has less than 2 messages :\n{source}"
+            )
+
+        conv = self._conversation.copy()
+
+        # Add the conversation system prompt if provided, otherwise use the default one
+        if source[0]["from"] == "system":
+            conv.system = source[0]["value"]
+            source.pop(0)
+
+        roles = {"human": conv.roles[0], "gpt": conv.roles[1]}
+
+        try:
+            # Apply prompt templates
+            if (
+                source[0]["from"] not in roles
+                or roles[source[0]["from"]] != conv.roles[0]
+            ):
+                # Skip the first one if it is not from human
+                source = source[1:]
+        except IndexError as err:
+            # sometimes there is a bing or system chat
+            raise err
+
+        conv.messages = []
+        for j, sentence in enumerate(source):
+            role = roles[sentence["from"]]
+            assert role == conv.roles[j % 2], SHAREGPT_ASSERTION_FAILED_ROLE
+            conv.append_message(role, sentence["value"])
+
+        for part in conv.get_prompt():
+            yield part
+
