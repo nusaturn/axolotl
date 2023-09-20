@@ -175,8 +175,6 @@ def load_model(
         LOG.info("patching _expand_mask")
         hijack_expand_mask()
 
-    model_config = load_model_config(cfg)
-
     # special handling b/c remote MixFormers code doesn't have _no_split_modules set
     if (
         "MixFormerSequentialConfig" in model_config.__class__.__name__
@@ -198,6 +196,10 @@ def load_model(
         if not hasattr(model_config, "quantization_config"):
             LOG.warning("model config does not contain quantization_config information")
         else:
+            if cfg.gptq_disable_exllama is not None:
+                model_config.quantization_config[
+                    "disable_exllama"
+                ] = cfg.gptq_disable_exllama
             model_kwargs["quantization_config"] = GPTQConfig(
                 **model_config.quantization_config
             )
