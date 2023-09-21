@@ -512,7 +512,7 @@ class AlpacaMTPromptTokenizingStrategy(PromptTokenizingStrategy):
                             ]
                         # not masked out from labels
                         labels = copy.deepcopy(res["input_ids"])
-                    elif part[0] == "SYSTEM:":
+                    elif part[0] == "### Instruction:\n":
                         part = part[1]  # Ignore the system role from preamble
                         # this is only ever the first part, should include the bos token and the user query
                         res = self._tokenize(
