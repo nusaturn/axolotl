@@ -394,7 +394,7 @@ class AlpacaMTPrompter:  # pylint: disable=too-few-public-methods
     def __init__(self, prompt_style=None, system_prompt: Optional[str] = None):
         if prompt_style != PromptStyle.CHAT.value:
             raise ValueError(
-                f"unsupported prompt_style for ShareGPTPrompter({prompt_style})"
+                f"unsupported prompt_style for AlpacaMTPrompter({prompt_style})"
             )
         system: str = (
             system_prompt
