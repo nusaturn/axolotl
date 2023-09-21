@@ -406,7 +406,7 @@ class AlpacaMTPrompter:  # pylint: disable=too-few-public-methods
         )
         self._conversation = AlpacaConversation(
             system=system,
-            roles=["\n\n### Input:\n", "\n\n### Response:\n"],
+            roles=["\n### Input:\n", "\n### Response:\n"],
             messages=[],
             offset=0,
             sep_style=SeparatorStyle.TWO,
