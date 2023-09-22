@@ -356,8 +356,8 @@ class AlpacaConversation:
     roles: List[str]
     messages: List[List[str]]
     offset: int
-    sep_style: SeparatorStyle = SeparatorStyle.SINGLE
-    sep: str = "###"
+    sep_style: SeparatorStyle = SeparatorStyle.TWO
+    sep: str = ""
     sep2: Optional[str] = None
 
     def get_prompt(self) -> Generator[Tuple[str, str], None, None]:
@@ -366,10 +366,10 @@ class AlpacaConversation:
         yield ("### Instruction:\n", preamble)
         for _, (role, message) in enumerate(self.messages):
             if message:
-                yield (role + ":", " " + message)
+                yield (role, message)
             else:
                 LOG.warning(f"role with empty message: {role}")
-                yield (role + ":", "")
+                yield (role, "")
 
     def copy(self):
         return AlpacaConversation(
@@ -409,7 +409,7 @@ class AlpacaMTPrompter:  # pylint: disable=too-few-public-methods
             roles=["\n### Input:\n", "\n### Response:\n"],
             messages=[],
             offset=0,
-            sep_style=SeparatorStyle.TWO,
+            sep_style=SeparatorStyle.SINGLE,
             sep=" ",
             sep2=" ",
         )
@@ -451,4 +451,5 @@ class AlpacaMTPrompter:  # pylint: disable=too-few-public-methods
 
         for part in conv.get_prompt():
             yield part
+
 
