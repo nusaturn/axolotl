@@ -1,10 +1,8 @@
 """Module containing the SimpleAlpacaMTPromptTokenizingStrategy class"""
 
+from typing import Generator, Optional
 from axolotl.prompt_tokenizers import AlpacaMTPromptTokenizingStrategy
 from axolotl.prompters import PromptStyle, AlpacaMTPrompter, SHAREGPT_ASSERTION_FAILED_ROLE
-from typing import Generator, List, Optional, Tuple, Union
-import dataclasses
-
 
 def load(tokenizer, cfg):
     return SimpleAlpacaMTPromptTokenizingStrategy(
@@ -25,7 +23,7 @@ def load_role(tokenizer, cfg):
 
 def load_therapist(tokenizer, cfg):
     return SimpleAlpacaMTPromptTokenizingStrategy(
-        AlpacaMTPrompter(
+        TherapistMTPrompter(
             PromptStyle.CHAT.value, system_prompt='''You are a responsive and skilled therapist taking care of a patient who is looking for guidance and advice on managing their emotions and treating other mental health issues through text based therapy. Attentively listen to the patient and answer the patient's questions in an empathetic and non-judgemental tone, and do not judge the patient for any issues they are facing. Offer acceptance, support, and care for the patient, regardless of their circumstances or struggles.  Make them comfortable and ask open ended questions in an empathetic manner that encourages self reflection. Also try to avoid giving false or misleading information, and caveat when you aren't entirely sure about the right answer. Remember to always respond to the patient caringly and be kind and understanding towards them.'''
         ),
         tokenizer,
@@ -35,8 +33,7 @@ def load_therapist(tokenizer, cfg):
 
 class TherapistMTPrompter(AlpacaMTPrompter):
     def __init__(self, prompt_style=None, system_prompt: Optional[str] = None):
-        self.system_prompt = '''You are a responsive and skilled therapist taking care of a patient who is looking for guidance and advice on managing their emotions and treating other mental health issues through text based therapy. Attentively listen to the patient and answer the patient's questions in an empathetic and non-judgemental tone, and do not judge the patient for any issues they are facing. Offer acceptance, support, and care for the patient, regardless of their circumstances or struggles.  Make them comfortable and ask open ended questions in an empathetic manner that encourages self reflection. Also try to avoid giving false or misleading information, and caveat when you aren't entirely sure about the right answer. Remember to always respond to the patient caringly and be kind and understanding towards them.'''
-        super().__init__(prompt_style=prompt_style, system_prompt=self.system_prompt)
+        super().__init__(prompt_style=prompt_style, system_prompt=system_prompt)
 
     def build_prompt(self, source) -> Generator[str, None, None]:
         if len(source) < 2:
